@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pengingat Tugas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: url('image.jpg') no-repeat center center fixed;
+            background-size: cover;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            overflow: hidden;
+            padding: 20px;
+            background: black;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-top: 50px;
+            position: relative;
+            border-radius: 10px;
+        }
+        h1 {
+            text-align: center;
+            color: white;
+        }
+        form {
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        label {
+            color: white;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: white;
+            color: #000;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: linear-gradient(to right, #ff4500, #ff7f50);
+            color: white;
+            font-weight: bold;
+        }
+        button:hover {
+            background: linear-gradient(to right, #ff7f50, #ff4500);
+        }
+        .agenda-list {
+            margin: 20px 0;
+        }
+        .agenda-item {
+            background: white;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            color: #000;
+        }
+        .modal, .popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            width: 300px;
+            padding: 20px;
+            z-index: 1000;
+            text-align: center;
+        }
+        .modal h3, .popup h3 {
+            text-align: center;
+        }
+        .modal p, .popup p {
+            font-size: 14px;
+            color: #555;
+            margin: 5px 0;
+        }
+        .modal button, .popup button {
+            width: 48%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: linear-gradient(to right, #ff4500, #ff7f50);
+            color: white;
+            font-weight: bold;
+        }
+        .modal button:hover, .popup button:hover {
+            background: linear-gradient(to right, #ff7f50, #ff4500);
+        }
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        input[type="text"], input[type="date"], input[type="time"] {
+            width: calc(100% - 20px);
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sistem Pengingat Tugas</h1>
+        <form id="agendaForm">
+            <label for="agenda">Nama Agenda:</label>
+            <input type="text" id="agenda" name="agenda" required>
+
+            <label for="tanggal">Tanggal:</label>
+            <input type="date" id="tanggal" name="tanggal" required>
+
+            <label for="waktu">Waktu:</label>
+            <input type="time" id="waktu" name="waktu" required>
+
+            <button type="submit">Tambah Agenda</button>
+        </form>
+
+        <div class="agenda-list" id="agendaList">
+            <h2>Daftar Agenda</h2>
+            <p>Belum ada agenda yang ditambahkan.</p>
+        </div>
+    </div>
+
+    <!-- Modal untuk konfirmasi -->
+    <div id="confirmModal" class="modal">
+        <h3>Konfirmasi Agenda</h3>
+        <p><strong>Agenda:</strong> <span id="modalAgenda"></span></p>
+        <p><strong>Tanggal:</strong> <span id="modalTanggal"></span></p>
+        <p><strong>Waktu:</strong> <span id="modalWaktu"></span></p>
+        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+            <button class="confirm" id="confirmButton">Konfirmasi</button>
+            <button class="cancel" id="cancelButton">Batal</button>
+        </div>
+    </div>
+
+    <!-- Popup untuk alarm -->
+    <div id="popup" class="popup">
+        <h3>Pengingat Tugas</h3>
+        <p><strong>Agenda:</strong> <span id="popupAgenda"></span></p>
+        <p><strong>Tanggal:</strong> <span id="popupDate"></span></p>
+        <p><strong>Pukul:</strong> <span id="popupTime"></span></p>
+        <button class="close-btn" onclick="closeAlarm()">Matikan Alarm</button>
+    </div>
+
+    <!-- Overlay -->
+    <div id="modalOverlay" class="overlay"></div>
+
+    <script>
+        const agendaForm = document.getElementById('agendaForm');
+        const agendaList = document.getElementById('agendaList');
+        const confirmModal = document.getElementById('confirmModal');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modalAgenda = document.getElementById('modalAgenda');
+        const modalTanggal = document.getElementById('modalTanggal');
+        const modalWaktu = document.getElementById('modalWaktu');
+        const confirmButton = document.getElementById('confirmButton');
+        const cancelButton = document.getElementById('cancelButton');
+        const popup = document.getElementById('popup');
+        const popupAgenda = document.getElementById('popupAgenda');
+        const popupDate = document.getElementById('popupDate');
+        const popupTime = document.getElementById('popupTime');
+        const alarmSound = new Audio('alarm.mp3'); // Pastikan alarm.mp3 ada di folder yang sama
+
+        let agendas = JSON.parse(localStorage.getItem('agendas')) || [];
+        let tempAgendaData = {};
+        let alarmInterval;
+
+        document.addEventListener('DOMContentLoaded', displayAgendas);
+
+        agendaForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const agenda = document.getElementById('agenda').value;
+            const tanggal = document.getElementById('tanggal').value;
+            const waktu = document.getElementById('waktu').value;
+
+            tempAgendaData = { agenda, tanggal, waktu };
+            modalAgenda.textContent = agenda;
+            modalTanggal.textContent = tanggal;
+            modalWaktu.textContent = waktu;
+
+            confirmModal.style.display = 'block';
+            modalOverlay.style.display = 'block';
+        });
+
+        confirmButton.addEventListener('click', function () {
+            agendas.push({ ...tempAgendaData, isNotified: false });
+            saveAgendasToLocalStorage();
+            displayAgendas();
+            closeModal();
+            agendaForm.reset();
+        });
+
+        cancelButton.addEventListener('click', closeModal);
+
+        function closeModal() {
+            confirmModal.style.display = 'none';
+            modalOverlay.style.display = 'none';
+            tempAgendaData = {};
+        }
+
+        function displayAgendas() {
+            agendaList.innerHTML = '<h2>Daftar Agenda</h2>';
+            if (agendas.length === 0) {
+                agendaList.innerHTML += '<p>Belum ada agenda yang ditambahkan.</p>';
+                return;
+            }
+
+            agendas.forEach((agenda, index) => {
+                const agendaItem = document.createElement('div');
+                agendaItem.classList.add('agenda-item');
+                agendaItem.innerHTML = `
+                    <p><strong>Agenda:</strong> ${agenda.agenda}</p>
+                    <p><strong>Tanggal:</strong> ${agenda.tanggal}</p>
+                    <p><strong>Waktu:</strong> ${agenda.waktu}</p>
+                    <button onclick="removeAgenda(${index})">Hapus</button>
+                `;
+                agendaList.appendChild(agendaItem);
+            });
+        }
+
+        function saveAgendasToLocalStorage() {
+            localStorage.setItem('agendas', JSON.stringify(agendas));
+        }
+
+        function removeAgenda(index) {
+            agendas.splice(index, 1);
+            saveAgendasToLocalStorage();
+            displayAgendas();
+        }
+
+        function checkAlarms() {
+            const now = new Date();
+            
+            agendas.forEach((agenda) => {
+                const agendaTime = new Date(`${agenda.tanggal}T${agenda.waktu}:00`);
+
+                // Jika waktu agenda sudah tercapai dan alarm belum dipicu
+                if (agendaTime <= now && !agenda.isNotified) {
+                    // Trigger alarm
+                    popupAgenda.textContent = agenda.agenda;
+                    popupDate.textContent = agenda.tanggal;
+                    popupTime.textContent = agenda.waktu;
+                    popup.style.display = 'block';
+                    modalOverlay.style.display = 'block';
+
+                    // Mainkan suara alarm
+                    alarmSound.play();
+
+                    // Tandai agenda agar alarm tidak dipicu lagi
+                    agenda.isNotified = true;
+                    saveAgendasToLocalStorage();
+                }
+            });
+        }
+
+        // Cek alarm setiap detik
+        alarmInterval = setInterval(checkAlarms, 1000);
+
+        function closeAlarm() {
+            popup.style.display = 'none';
+            modalOverlay.style.display = 'none';
+
+            // Hentikan suara alarm
+            alarmSound.pause();
+            alarmSound.currentTime = 0; // Kembalikan suara ke awal
+        }
+    </script>
+</body>
+</html>
